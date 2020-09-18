@@ -130,7 +130,7 @@ impl State {
     /// and 8 random filled spaces.
     pub fn new<R: Rng>(rng: &mut R) -> Self {
         let mut self_ = Self::with_dot(Pos::near_center(rng));
-        for _ in 0..8 {
+        for _ in 0..3 {
             let pos = Pos::random(&mut *rng);
             let _ = self_.fill(pos);
         }
@@ -256,51 +256,6 @@ impl State {
             })
     }
 
-    /// Return an estimation of the expected utility
-    /// awarded to the placer at the current state
-    /// (assuming it is not their turn). Search no
-    /// further than `lvl` levels down into the game
-    /// tree.
-    fn approx_utility_placer(self, lvl: u8) -> i8 {
-        if lvl == 0 {
-            self.dot().dist_to_edge() as i8
-        } else {
-            self.branch_dot()
-                .iter()
-                .filter_map(|&ns| ns)
-                .map(|ns| match ns {
-                    None => -100, // TODO: ensure this is treated as -inf
-                    Some(new_state) =>
-                        -new_state.approx_utility_dot(lvl - 1),
-                })
-                .min()
-                // cannot panic, because we know this iterator
-                // has length 6
-                .unwrap()
-        }
-    }
-
-    /// Return an estimation of the expected utility
-    /// awarded to the dot at the current state
-    /// (assuming it is not their turn). Search no
-    /// further than `lvl` levels down into the game
-    /// tree.
-    fn approx_utility_dot(self, lvl: u8) -> i8 {
-        if lvl == 0 {
-            -(self.dot().dist_to_edge() as i8)
-        } else {
-            self.branch_placer()
-                .map(|ns| match ns {
-                    None => -100, // TODO: ensure this is treated as -inf
-                    Some(new_state) =>
-                        -new_state.approx_utility_placer(lvl - 1),
-                })
-                .min()
-                // can panic if the grid is already full
-                .expect("called `approx_utility_dot`, but grid is full")
-        }
-    }
-
     /// Write a string representation of this board to `w`.
     pub fn display<W: Write>(self, mut w: W) -> io::Result<()> {
         let dot_pos = self.dot();
@@ -316,7 +271,7 @@ impl State {
                 write!(w, "{}{}",
                     if pos == dot_pos { '@' }
                     else if self.has_filled(pos) { 'o' }
-                    else { '.' },
+                    else { '·' },
                     if x + 1 == BOARD_W { '\n' }
                     else { ' ' },
                 )?;
@@ -340,16 +295,16 @@ pub fn main() -> io::Result<()> {
     let mut rng = rand::thread_rng();
     let mut state = State::new(&mut rng);
 
-    let mut placer_strategy = s::PlacerPredictive::new(s::SmartPathfind);
+    let mut placer_strategy = s::PlacerPredictive::new(rng, s::SmartPathfind);
     let mut dot_strategy = s::SmartPathfind;
     
     'outer: loop {
         // perform placer actions
         {
+            std::thread::sleep(
+               std::time::Duration::from_millis(200));
             clear_screen();
             state.display(&mut stdout)?;
-            std::thread::sleep(
-               std::time::Duration::from_millis(100));
 
             let mut actions = Vec::new();
             for n in state.branch_placer() {
@@ -368,10 +323,10 @@ pub fn main() -> io::Result<()> {
 
         // perform dot actions
         {
+            std::thread::sleep(
+                std::time::Duration::from_millis(200));
             clear_screen();
             state.display(&mut stdout)?;
-            std::thread::sleep(
-                std::time::Duration::from_millis(100));
 
             let mut actions = Vec::new();
             for &rx in &state.branch_dot() {
