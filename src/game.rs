@@ -1,10 +1,11 @@
 use rand::Rng;
 
 use std::fmt;
-use std::io::{self, BufRead, Write};
+use std::io::{self, Write};
 
 mod strategy;
 use strategy::DotStrategy as _;
+use strategy::PlacerStrategy as _;
 
 const BOARD_W: usize = 9;
 const BOARD_H: usize = 9;
@@ -176,15 +177,15 @@ impl State {
         loop {
             steps += 1;
             std::mem::swap(&mut new_frontier, &mut old_frontier);
-            if old_frontier.len() == 0 {
+            if old_frontier.is_empty() {
                 return None;
             }
             for pos in old_frontier.drain(..) {
                 for &n in &pos.neighbors() {
                     if let Some(neighbor) = n {
-                        if searched & (1 << neighbor.0) == 0
+                        if searched & (1u128 << neighbor.0) == 0
                         && !self.has_filled(neighbor) {
-                            searched |= 1 << (neighbor.0 as u128);
+                            searched |= 1u128 << neighbor.0;
                             new_frontier.push(neighbor);
                         }
                     } else {
@@ -332,72 +333,62 @@ fn clear_screen() {
 }
 
 pub fn main() -> io::Result<()> {
-    let stdin = io::stdin();
-    let mut stdin = stdin.lock();
-
+    use strategy as s;
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
 
     let mut rng = rand::thread_rng();
     let mut state = State::new(&mut rng);
 
-    let mut input_buf = String::new();
-
-    let mut dot_strategy = strategy::DotUtilityMax;
+    let mut placer_strategy = s::PlacerPredictive::new(s::SmartPathfind);
+    let mut dot_strategy = s::SmartPathfind;
     
     'outer: loop {
-        clear_screen();
-        state.display(&mut stdout)?;
+        // perform placer actions
+        {
+            clear_screen();
+            state.display(&mut stdout)?;
+            std::thread::sleep(
+               std::time::Duration::from_millis(100));
 
-        loop {
-            input_buf.clear();
-            stdout.write_all(b"> ")?;
-            stdout.flush()?;
-            stdin.read_line(&mut input_buf)?;
-
-            let words: Vec<_> = input_buf.split_whitespace().collect();
-            if words.len() == 2 {
-                if let Ok(x) = words[0].parse() {
-                    if let Ok(y) = words[1].parse() {
-                        if (0..BOARD_W as u8).contains(&x)
-                        && (0..BOARD_H as u8).contains(&y) {
-                            let pos = Pos::from_xy(x, y);
-                            if state.fill(pos) {
-                                break
-                            }
-                        }
-                    }
-                }
-            }
-            stdout.write_all(b"Please specify a valid location.\n")?;
-        }
-
-        clear_screen();
-        state.display(&mut stdout)?;
-
-        if state.placer_win() {
-            stdout.write_all(b"You win!\n")?;
-            break
-        }
-        stdout.flush()?;
-
-        std::thread::sleep(
-            std::time::Duration::from_millis(500));
-
-        let mut reactions = Vec::new();
-        for &rx in &state.branch_dot() {
-            match rx {
-                None => {}
-                Some(None) => {
-                    stdout.write_all(b"The dot wins.\n")?;
+            let mut actions = Vec::new();
+            for n in state.branch_placer() {
+                if let Some(new_state) = n {
+                    actions.push(new_state);
+                } else {
+                    stdout.write_all(b"placer\n")?;
                     stdout.flush()?;
-                    break 'outer;
+                    break 'outer
                 }
-                Some(Some(new_state)) => reactions.push(new_state),
             }
+
+            let pref_idx = placer_strategy.preferred_state(&actions);
+            state = actions[pref_idx];
         }
-        let rx_idx = dot_strategy.preferred_state(&reactions);
-        state = reactions[rx_idx];
+
+        // perform dot actions
+        {
+            clear_screen();
+            state.display(&mut stdout)?;
+            std::thread::sleep(
+                std::time::Duration::from_millis(100));
+
+            let mut actions = Vec::new();
+            for &rx in &state.branch_dot() {
+                match rx {
+                    None => {}
+                    Some(None) => {
+                        stdout.write_all(b"dot\n")?;
+                        stdout.flush()?;
+                        break 'outer;
+                    }
+                    Some(Some(new_state)) => actions.push(new_state),
+                }
+            }
+            let rx_idx = dot_strategy.preferred_state(&actions);
+            state = actions[rx_idx];
+        }
+
     }
 
     Ok(())

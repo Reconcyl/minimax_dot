@@ -2,7 +2,7 @@ use super::State;
 
 /// The number of recursion levels used by strategies
 /// to search when using `approx_utility_dot`.
-const UTILITY_APPROX_LVL: u8 = 5;
+const UTILITY_APPROX_LVL: u8 = 4;
 
 /// Represents a strategy that could be used by the dot.
 pub trait DotStrategy {
@@ -78,6 +78,12 @@ impl PlacerStrategy for PlacerUtilityMax {
 /// dot the lowest utility after its turn.
 pub struct PlacerPredictive<S> {
     dot_strategy: S,
+}
+
+impl<S> PlacerPredictive<S> {
+    pub fn new(dot_strategy: S) -> Self {
+        Self { dot_strategy }
+    }
 }
 
 impl<S: DotStrategy + Send> PlacerStrategy for PlacerPredictive<S> {
