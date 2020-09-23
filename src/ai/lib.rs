@@ -130,7 +130,7 @@ impl State {
     /// and 8 random filled spaces.
     pub fn new<R: Rng>(rng: &mut R) -> Self {
         let mut self_ = Self::with_dot(Pos::near_center(rng));
-        for _ in 0..3 {
+        for _ in 0..8 {
             let pos = Pos::random(&mut *rng);
             let _ = self_.fill(pos);
         }
