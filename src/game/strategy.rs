@@ -7,6 +7,22 @@ pub trait DotStrategy {
     /// Given a non-empty list of potential states, return
     /// the index of the state which is most preferred.
     fn preferred_state(&mut self, choices: &[State]) -> usize;
+
+    /// Update the given state according to this strategy.
+    /// Return `None` to indicate a winning move.
+    fn play(&mut self, state: State) -> Option<State> {
+        // smallvec
+        let mut choices = [State::default(); 6];
+        let mut n_choices = 0;
+        for &ns in &state.branch_dot() {
+            if let Some(new_state) = ns {
+                choices[n_choices] = new_state?;
+                n_choices += 1;
+            }
+        }
+        let choice_idx = self.preferred_state(&choices[0..n_choices]);
+        Some(choices[choice_idx])
+    }
 }
 
 /// A dumb strategy for the dot, causing it to move
@@ -42,6 +58,17 @@ pub trait PlacerStrategy {
     /// Given a non-empty list of potential states, return
     /// the index of the state which is most preferred.
     fn preferred_state(&mut self, choices: &[State]) -> usize;
+
+    /// Update the given state according to this strategy.
+    /// Return `None` to indicate a winning move.
+    fn play(&mut self, state: State) -> Option<State> {
+        let mut choices = Vec::new();
+        for new_state in state.branch_placer() {
+            choices.push(new_state?);
+        }
+        let choice_idx = self.preferred_state(&choices);
+        Some(choices[choice_idx])
+    }
 }
 
 /// A strategy for the placer which is parameterized by
@@ -101,24 +128,10 @@ impl<R: Rng, S: DotStrategy> PlacerStrategy for PlacerPredictive<R, S> {
             if n == 0 {
                 Outcome::Play(state.dot().dist_to_edge())
             } else {
-                // find all possible dot actions using a smallvec
-                let mut dot_actions = [State::default(); 6];
-                let mut dot_actions_len = 0;
-                for &ns in &state.branch_dot() {
-                    match ns {
-                        None => {}
-                        Some(None) => return Outcome::Lose(0),
-                        Some(Some(new_state)) => {
-                            dot_actions[dot_actions_len] = new_state;
-                            dot_actions_len += 1;
-                        }
-                    }
-                }
-
-                // determine which action the dot will most prefer
-                let dot_action_idx = dot_strategy.preferred_state(
-                    &dot_actions[0..dot_actions_len]);
-                let dot_state = dot_actions[dot_action_idx];
+                let dot_state = match dot_strategy.play(state) {
+                    Some(s) => s,
+                    None => return Outcome::Lose(0),
+                };
 
                 // recursively determine: what the best way
                 // to respond to this?

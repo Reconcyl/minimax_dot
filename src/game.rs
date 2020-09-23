@@ -32,7 +32,7 @@ impl Pos {
     fn random<R: Rng>(mut rng: R) -> Self {
         Self(rng.gen_range(0, BOARD_SIZE as u8))
     }
-    
+
     /// Construct a position from a pair of coordinates.
     fn from_xy(x: u8, y: u8) -> Self {
         debug_assert!(x < (BOARD_W as u8));
@@ -281,8 +281,6 @@ impl State {
     }
 }
 
-// TODO: improve interface
-
 fn clear_screen() {
     print!("\x1b[H\x1b[2J");
 }
@@ -297,53 +295,35 @@ pub fn main() -> io::Result<()> {
 
     let mut placer_strategy = s::PlacerPredictive::new(rng, s::SmartPathfind);
     let mut dot_strategy = s::SmartPathfind;
-    
-    'outer: loop {
+
+    loop {
         // perform placer actions
-        {
-            std::thread::sleep(
-               std::time::Duration::from_millis(200));
-            clear_screen();
-            state.display(&mut stdout)?;
+        std::thread::sleep(
+            std::time::Duration::from_millis(200));
+        clear_screen();
+        state.display(&mut stdout)?;
 
-            let mut actions = Vec::new();
-            for n in state.branch_placer() {
-                if let Some(new_state) = n {
-                    actions.push(new_state);
-                } else {
-                    stdout.write_all(b"placer\n")?;
-                    stdout.flush()?;
-                    break 'outer
-                }
-            }
-
-            let pref_idx = placer_strategy.preferred_state(&actions);
-            state = actions[pref_idx];
+        if let Some(s) = placer_strategy.play(state) {
+            state = s;
+        } else {
+            stdout.write_all(b"placer\n")?;
+            stdout.flush()?;
+            break
         }
 
         // perform dot actions
-        {
-            std::thread::sleep(
-                std::time::Duration::from_millis(200));
-            clear_screen();
-            state.display(&mut stdout)?;
+        std::thread::sleep(
+            std::time::Duration::from_millis(200));
+        clear_screen();
+        state.display(&mut stdout)?;
 
-            let mut actions = Vec::new();
-            for &rx in &state.branch_dot() {
-                match rx {
-                    None => {}
-                    Some(None) => {
-                        stdout.write_all(b"dot\n")?;
-                        stdout.flush()?;
-                        break 'outer;
-                    }
-                    Some(Some(new_state)) => actions.push(new_state),
-                }
-            }
-            let rx_idx = dot_strategy.preferred_state(&actions);
-            state = actions[rx_idx];
+        if let Some(s) = dot_strategy.play(state) {
+            state = s;
+        } else {
+            stdout.write_all(b"dot\n")?;
+            stdout.flush()?;
+            break;
         }
-
     }
 
     Ok(())
