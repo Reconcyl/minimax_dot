@@ -60,7 +60,7 @@ impl<R, S> PlacerPredictive<R, S> {
     }
 }
 
-const SEARCH_DEPTH: u8 = 3;
+const SEARCH_DEPTH: u8 = 4;
 
 impl<R: Rng, S: DotStrategy> PlacerStrategy for PlacerPredictive<R, S> {
     fn preferred_state(&mut self, choices: &[State]) -> usize {
