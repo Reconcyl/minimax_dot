@@ -7,8 +7,12 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
-name = "minimax_dot_ai"
-path = "src/lib.rs"
+name = "ai"
+path = "src/ai/lib.rs"
+
+[[bin]]
+name = "term_viz"
+path = "src/term_viz/main.rs"
 
 [dependencies]
 static_assertions = "1.1.0"
